@@ -1,4 +1,4 @@
-const CACHE_NAME = 'misgastos-v1';
+const CACHE_NAME = 'misgastos-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -22,6 +22,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./index.html')))
+    fetch(e.request)
+      .then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
   );
 });
