@@ -1239,9 +1239,17 @@ function renderExpenses() {
         <div class="expense-meta">${cat.name}</div>
       </div>
       <div class="expense-amount">-${fmt(e.amount)}</div>
+      <button class="item-delete-btn" onclick="event.stopPropagation();deleteExpense(${e.id})">✕</button>
     </div>`;
   });
   c.innerHTML = html;
+}
+
+function deleteExpense(id) {
+  data.expenses = data.expenses.filter(e => e.id !== id);
+  saveData();
+  render();
+  toast('Gasto eliminado');
 }
 
 function renderSubs() {
