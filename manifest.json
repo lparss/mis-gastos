@@ -1,0 +1,23 @@
+{
+  "name": "Mis Gastos",
+  "short_name": "Gastos",
+  "description": "Registra tus gastos diarios rápidamente",
+  "start_url": "/mis-gastos/",
+  "scope": "/mis-gastos/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
