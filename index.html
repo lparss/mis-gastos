@@ -1092,6 +1092,15 @@ function fmt(n) {
 function monthKey(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
+function prevMonthKey(d) {
+  const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  return monthKey(prev);
+}
+function isActiveInMonth(item, mk) {
+  if (item.startMonth && item.startMonth > mk) return false;
+  if (item.endMonth && item.endMonth < mk) return false;
+  return true;
+}
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1126,9 +1135,10 @@ function renderMonth() {
 }
 
 function renderSummary() {
+  const mk = monthKey(currentMonth);
   const total = getMonthExpenses().reduce((s,e) => s + Number(e.amount), 0);
-  const subTotal = data.subscriptions.reduce((s,e) => s + Number(e.amount), 0);
-  const casaTotal = data.houseBills ? data.houseBills.reduce((s,b) => s + Number(b.amount), 0) : 0;
+  const subTotal = data.subscriptions.filter(s => isActiveInMonth(s, mk)).reduce((s,e) => s + Number(e.amount), 0);
+  const casaTotal = data.houseBills ? data.houseBills.filter(b => isActiveInMonth(b, mk)).reduce((s,b) => s + Number(b.amount), 0) : 0;
   document.getElementById('totalMonth').textContent = fmt(total);
   document.getElementById('totalSubs').textContent = fmt(subTotal) + '/mes';
   document.getElementById('totalCasa').textContent = fmt(casaTotal) + '/mes';
@@ -1220,11 +1230,13 @@ function renderExpenses() {
 
 function renderSubs() {
   const c = document.getElementById('subList');
-  if (!data.subscriptions.length) {
+  const mk = monthKey(currentMonth);
+  const activeSubs = data.subscriptions.filter(s => isActiveInMonth(s, mk));
+  if (!activeSubs.length) {
     c.innerHTML = '<div class="empty"><div class="icon">🔄</div><p>Sin suscripciones.<br>Agrega tus servicios mensuales.</p></div>';
     return;
   }
-  c.innerHTML = data.subscriptions.map(s => {
+  c.innerHTML = activeSubs.map(s => {
     const cat = getCat(s.category);
     return `<div class="sub-item" onclick="editSub(${s.id})">
       <div class="sub-icon">${cat.emoji}</div>
@@ -1239,9 +1251,10 @@ function renderSubs() {
 
 // ── Casa (House Bills) ──
 function renderCasa() {
-  const fixed = data.houseBills.filter(b => b.type === 'fixed');
-  const variable = data.houseBills.filter(b => b.type === 'variable');
-  const total = data.houseBills.reduce((s,b) => s + Number(b.amount), 0);
+  const mk = monthKey(currentMonth);
+  const fixed = data.houseBills.filter(b => b.type === 'fixed' && isActiveInMonth(b, mk));
+  const variable = data.houseBills.filter(b => b.type === 'variable' && isActiveInMonth(b, mk));
+  const total = data.houseBills.filter(b => isActiveInMonth(b, mk)).reduce((s,b) => s + Number(b.amount), 0);
 
   document.getElementById('casaTotalAmount').textContent = fmt(total) + '/mes';
 
@@ -1310,13 +1323,14 @@ function saveCasa() {
   if (!name) { toast('Pon el nombre del servicio'); return; }
   if (!amount || amount <= 0) { toast('Pon el costo'); return; }
 
-  const entry = { id: editingCasaId || Date.now(), name, amount, type: casaType };
-
   if (editingCasaId) {
     const idx = data.houseBills.findIndex(b => b.id === editingCasaId);
-    if (idx >= 0) data.houseBills[idx] = entry;
+    if (idx >= 0) {
+      const existing = data.houseBills[idx];
+      data.houseBills[idx] = { id: editingCasaId, name, amount, type: casaType, startMonth: existing.startMonth };
+    }
   } else {
-    data.houseBills.push(entry);
+    data.houseBills.push({ id: Date.now(), name, amount, type: casaType, startMonth: monthKey(currentMonth) });
   }
 
   saveData();
@@ -1327,7 +1341,10 @@ function saveCasa() {
 
 function deleteCasa() {
   if (!editingCasaId) return;
-  data.houseBills = data.houseBills.filter(b => b.id !== editingCasaId);
+  const idx = data.houseBills.findIndex(b => b.id === editingCasaId);
+  if (idx >= 0) {
+    data.houseBills[idx] = { ...data.houseBills[idx], endMonth: prevMonthKey(currentMonth) };
+  }
   saveData();
   closeModals();
   render();
@@ -1520,13 +1537,14 @@ function saveSub() {
   if (!amount || amount <= 0) { toast('Pon el costo'); return; }
   if (!selectedCat) { toast('Selecciona categoría'); return; }
 
-  const entry = { id: editingSubId || Date.now(), name, amount, category: selectedCat };
-
   if (editingSubId) {
     const idx = data.subscriptions.findIndex(s => s.id === editingSubId);
-    if (idx >= 0) data.subscriptions[idx] = entry;
+    if (idx >= 0) {
+      const existing = data.subscriptions[idx];
+      data.subscriptions[idx] = { id: editingSubId, name, amount, category: selectedCat, startMonth: existing.startMonth };
+    }
   } else {
-    data.subscriptions.push(entry);
+    data.subscriptions.push({ id: Date.now(), name, amount, category: selectedCat, startMonth: monthKey(currentMonth) });
   }
 
   saveData();
@@ -1537,11 +1555,14 @@ function saveSub() {
 
 function deleteSub() {
   if (!editingSubId) return;
-  data.subscriptions = data.subscriptions.filter(s => s.id !== editingSubId);
+  const idx = data.subscriptions.findIndex(s => s.id === editingSubId);
+  if (idx >= 0) {
+    data.subscriptions[idx] = { ...data.subscriptions[idx], endMonth: prevMonthKey(currentMonth) };
+  }
   saveData();
   closeModals();
   render();
-  toast('Suscripción eliminada');
+  toast('Suscripción cancelada');
 }
 
 function editSub(id) {
